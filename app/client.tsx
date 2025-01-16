@@ -29,9 +29,13 @@ export default function App() {
   const [nodes, setNodes] = useNodesState<Node>([]);
   const [edges, setEdges] = useEdgesState<Edge>([]);
 
+  // Get the room name from the URL search params (if any)
+  // This allows multiple "rooms" to be created on the same server, each with their own state
+  const room =
+    new URLSearchParams(window.location.search).get("room") ?? "flow-room";
+
   const socket = usePartySocket({
-    // Use any room name here
-    room: "flow-room",
+    room,
     onMessage(evt) {
       const messageData = JSON.parse(evt.data) as FlowStateMessage;
 
