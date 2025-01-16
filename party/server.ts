@@ -1,7 +1,21 @@
+import type { Edge, Node, NodeChange, NodePositionChange } from "@xyflow/react";
 import type * as Party from "partykit/server";
+import type {
+  FlowStateMessage,
+  StateChangeMessage,
+} from "../types/flow-state-message.type";
+
+const INITIAL_NODES: Node[] = [
+  { id: "1", position: { x: 0, y: 0 }, data: { label: "1" } },
+  { id: "2", position: { x: 0, y: 100 }, data: { label: "2" } },
+  { id: "3", position: { x: 0, y: 200 }, data: { label: "3" } },
+];
+
+const INITIAL_EDGES: Edge[] = [{ id: "e1-2", source: "1", target: "2" }];
 
 export default class Server implements Party.Server {
-  count = 0;
+  nodes: Node[] = INITIAL_NODES;
+  edges: Edge[] = INITIAL_EDGES;
 
   constructor(readonly room: Party.Room) {}
 
@@ -14,36 +28,40 @@ export default class Server implements Party.Server {
   url: ${new URL(ctx.request.url).pathname}`
     );
 
-    // send the current count to the new client
-    conn.send(this.count.toString());
+    // Send the current diagram state to the new client
+    conn.send(
+      JSON.stringify({
+        nodes: this.nodes,
+        edges: this.edges,
+      } as FlowStateMessage)
+    );
   }
 
   onMessage(message: string, sender: Party.Connection) {
     // let's log the message
     console.log(`connection ${sender.id} sent message: ${message}`);
-    // we could use a more sophisticated protocol here, such as JSON
-    // in the message data, but for simplicity we just use a string
-    if (message === "increment") {
-      this.increment();
+
+    const messageData = JSON.parse(message) as StateChangeMessage;
+
+    if (messageData.type === "node") {
+      this.nodes = messageData.nodes;
+      this.broadcastState();
+    }
+
+    if (messageData.type === "edge") {
+      this.edges = messageData.edges;
+      this.broadcastState();
     }
   }
 
-  onRequest(req: Party.Request) {
-    // response to any HTTP request (any method, any path) with the current
-    // count. This allows us to use SSR to give components an initial value
-
-    // if the request is a POST, increment the count
-    if (req.method === "POST") {
-      this.increment();
-    }
-
-    return new Response(this.count.toString());
-  }
-
-  increment() {
-    this.count = (this.count + 1) % 100;
-    // broadcast the new count to all clients
-    this.room.broadcast(this.count.toString(), []);
+  broadcastState() {
+    this.room.broadcast(
+      JSON.stringify({
+        nodes: this.nodes,
+        edges: this.edges,
+      } as FlowStateMessage),
+      []
+    );
   }
 }
 
